@@ -51,8 +51,6 @@
             </plugin>
 
             <!-- Ekstazi Plugin - Regression Test Selection -->
-            <!-- Uncomment to enable Ekstazi RTS. Note: May require additional JVM configuration. -->
-            <!--
             <plugin>
                 <groupId>org.ekstazi</groupId>
                 <artifactId>ekstazi-maven-plugin</artifactId>
@@ -66,7 +64,6 @@
                     </execution>
                 </executions>
             </plugin>
-            -->
         </plugins>
     </build>
 </project>
