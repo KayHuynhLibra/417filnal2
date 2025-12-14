@@ -1,0 +1,289 @@
+\documentclass{article}
+
+\usepackage{graphicx} % Required for inserting images
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\title{Group Project: Continuous Integration and Regression Test Selection}
+\author{Shubham Bhattacharya, Brayden Hayworth, Kim Sang Huynh, Sam Rowland}
+\date{December 2025}
+
+\begin{document}
+
+\graphicspath{{images/}} 
+\setlength{\parindent}{15pt}
+
+\maketitle
+
+\section{Introduction}
+
+Software testing is a critical component of the Software Development Life Cycle (SDLC), ensuring that applications meet requirements and are free of critical defects. With the advent of Agile methodologies, Continuous Integration (CI) has become the standard practice, where developers merge code changes frequently into a shared repository. However, as software projects grow in size and complexity, the size of the test suite increases proportionally, leading to a significant bottleneck: the "Retest All" strategy. Running thousands of tests for every minor code change consumes excessive time and computational resources, creating delays in the feedback loop for developers.
+
+This report explores an advanced testing technique within the CI ecosystem: \textbf{Regression Test Selection (RTS)}. Specifically, we investigate how RTS can optimize the CI pipeline by intelligently selecting only the relevant tests affected by code changes, rather than executing the entire test suite. We will demonstrate this using \textbf{Ekstazi}, a state-of-the-art RTS tool, integrated into an open-source Java project. Through empirical evaluation, we measure the time savings and efficiency gains achieved by this approach in a real-world CI environment using GitHub Actions.
+
+\section{History}
+
+\paragraph{The software development life cycle (SDLC) is traditionally divided into six stages: planning, requirements analysis, design, development, testing, and deployment, with maintenance often included afterward. Planning involves deciding the scope and goals of the software. Information is gathered through analysis to define the requirements for accomplishing the goals. The software design architecture is established through documentation. The software is developed based on the architecture and requirements, tested to eliminate bugs and verify functionality, and deployed to users. These stages form the backbone of various SDLC models and methodologies.}
+
+\paragraph{In 1956, Herbert Bennington would introduce one of the most influential SDLC models: the waterfall model. Bennington believed that software should be constructed in stages. This was elaborated on in 1970, when William Royce founded the SDLC stages. The original waterfall method operated on the principle that each stage in the life cycle couldn't be visited until the previous stage was completed. This model provided a rigid structure for software development, intended to make the process more defined, convenient, and efficient. As the model gained prominence, Royce noted a critical flaw in its design. Because each stage has to be completed in succession, there was no opportunity for a team to revisit previous stages in the life cycle after unforeseen changes. He revised the waterfall method to include a feedback loop; upon being presented with new information, a team could decide to revisit the preceding stage in the life cycle. This proved to be helpful, yet limited, as developments in later stages of the life cycle, such as programming or testing, may necessitate revisiting the planning or requirements stages, which the waterfall model could not accommodate. Nevertheless, the waterfall model became the foundation for many different SDLC models. Future models would explore feedback loops, which became essential for projects and teams to adapt to changing requirements. Notable models that evolved from the baseline set by the waterfall model include the V-model and the spiral model.}
+
+\paragraph{As software systems became more complex and market demands required faster delivery cycles, the rigidness of Waterfall and V-model gave way to Agile methodologies in the early 2000s. Pioneers like Kent Beck introduced Extreme Programming (XP), which emphasized automated testing, pair programming, and short feedback loops. This laid the foundation for Continuous Integration (CI), where integration happens daily or even multiple times per day rather than at the end of a project. Martin Fowler's seminal work on CI established it as a best practice, where developers frequently integrate their work, leading to early detection of integration problems. Today, CI/CD pipelines automate the testing process, but they face new challenges regarding scalability and speed as test suites grow, necessitating advanced techniques like Regression Test Selection, which is the focus of this report.}
+
+\section{Previous/Alternative Approaches}
+
+\subsection{Retest All Strategy}
+
+Before the advent of Regression Test Selection techniques, software teams primarily relied on the "Retest All" strategy. This approach executes the entire test suite whenever any code change is made, regardless of the scope or impact of the modification. While this strategy is safe and guarantees comprehensive coverage, it becomes increasingly inefficient as projects scale. For large projects with thousands of tests, running the full suite can take hours, creating a bottleneck in the development workflow.
+
+The Retest All approach has several characteristics:
+\begin{itemize}
+    \item \textbf{Safety:} Guarantees that all tests are executed, ensuring no regressions are missed.
+    \item \textbf{Simplicity:} Requires no special tooling or configuration.
+    \item \textbf{Inefficiency:} Executes many unnecessary tests, wasting time and resources.
+    \item \textbf{Poor Scalability:} Performance degrades linearly with test suite size.
+\end{itemize}
+
+\subsection{Alternative Optimization Techniques}
+
+Several alternative approaches have emerged to address the inefficiency of Retest All:
+
+\subsubsection{Test Prioritization}
+
+Test Prioritization attempts to order tests by importance or likelihood of failure, running critical tests first \cite{rothermel}. This approach can provide faster feedback on high-priority failures, but it still requires executing all tests eventually. The main limitation is that it does not reduce the total number of tests executed, only their execution order.
+
+\subsubsection{Parallelization}
+
+Parallelization distributes tests across multiple machines or containers to reduce wall-clock time. While this can significantly reduce the time developers wait for results, it increases infrastructure costs and resource consumption. For example, running tests on 4 parallel machines quadruples the compute cost, even though the same number of tests are executed.
+
+\subsubsection{Test Flakiness Detection}
+
+Test Flakiness Detection addresses unreliable tests that intermittently fail due to timing issues, network conditions, or other non-deterministic factors \cite{ci_survey}. While important for CI reliability, this technique does not reduce the number of tests executed; it only helps identify and fix problematic tests.
+
+\subsubsection{Limitations of Alternative Approaches}
+
+None of these alternative approaches fundamentally solve the problem of unnecessary test execution. They either:
+\begin{itemize}
+    \item Still execute all tests (Prioritization, Flakiness Detection)
+    \item Increase costs without reducing test count (Parallelization)
+    \item Address related but different problems (Flakiness Detection)
+\end{itemize}
+
+\subsection{The RTS Paradigm Shift}
+
+Regression Test Selection represents a paradigm shift: instead of running all tests or prioritizing them, it intelligently selects only the subset of tests that could be affected by the code changes. This approach, pioneered by researchers like Rothermel and Harrold \cite{rothermel}, analyzes dependencies between code and tests to determine which tests must be re-executed. Modern implementations like Ekstazi make this technique practical for real-world use by providing:
+
+\begin{itemize}
+    \item Automatic dependency tracking at the bytecode level
+    \item Minimal configuration overhead
+    \item Integration with popular build tools (Maven, Gradle)
+    \item Proven effectiveness in industrial settings
+\end{itemize}
+
+\section{Technical Description: Regression Test Selection}
+
+\paragraph{Regression Test Selection (RTS) is an advanced technique designed to solve the efficiency problem in CI pipelines. Instead of running all tests, RTS analyzes the changes in the source code and computes the subset of tests that must be run to ensure no regressions were introduced. The fundamental principle is that if a piece of code has not changed, and no code it depends on has changed, then tests for that code do not need to be re-executed.}
+
+\paragraph{The specific tool selected for this study is \textbf{Ekstazi}, developed by researchers at the University of Illinois. Ekstazi operates at the Java bytecode level, making it language-agnostic for Java-based projects. It tracks dynamic dependencies between test classes and source classes during test execution. When a test runs, Ekstazi monitors which compiled class files (`.class` files) are accessed by that test. This information is stored in a dependency graph.}
+
+\paragraph{In subsequent CI runs, Ekstazi computes checksums (hash values) of all compiled classes. If a class's checksum has changed (indicating a code modification), Ekstazi identifies all tests that depend on that class through the dependency graph and selects only those tests for execution. Tests whose dependencies remain unchanged are skipped entirely. This approach drastically reduces feedback time in the CI pipeline while maintaining safety guarantees.}
+
+\paragraph{To illustrate with a concrete example: consider a project with three modules: \texttt{UserService}, \texttt{PaymentService}, and \texttt{OrderService}. If a developer modifies only the \texttt{UserService} class, Ekstazi will identify that only tests directly or indirectly dependent on \texttt{UserService} need to run. Tests for \texttt{PaymentService} and \texttt{OrderService} are skipped, potentially saving significant execution time.}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{rts_diagram}
+    \caption{Workflow of Regression Test Selection: Code changes trigger dependency analysis, which selects only affected tests.}
+    \label{fig:rts_workflow}
+\end{figure}
+
+\section{Evaluation}
+
+To evaluate the effectiveness of Regression Test Selection in a real-world CI environment, we conducted an experiment using the \textbf{Apache Commons CSV} library, an open-source Java project with a comprehensive JUnit test suite. This project was selected because it represents a typical medium-scale software library with well-structured tests, making it ideal for demonstrating RTS benefits.
+
+\subsection{Experimental Setup}
+
+We configured two experimental scenarios:
+
+\begin{enumerate}
+    \item \textbf{Baseline (Retest All):} Running the standard Maven test command without RTS, which executes all tests regardless of changes.
+    \item \textbf{With Ekstazi (RTS):} Configuring the project to use Ekstazi for intelligent test selection.
+\end{enumerate}
+
+The \texttt{pom.xml} was modified to include the Ekstazi Maven plugin:
+
+\begin{lstlisting}[language=XML, basicstyle=\footnotesize, frame=single]
+<plugin>
+    <groupId>org.ekstazi</groupId>
+    <artifactId>ekstazi-maven-plugin</artifactId>
+    <version>5.3.0</version>
+    <executions>
+        <execution>
+            <id>ekstazi</id>
+            <goals>
+                <goal>select</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+\end{lstlisting}
+
+\subsection{CI Environment: GitHub Actions}
+
+To simulate a real-world Continuous Integration environment, we configured a pipeline using \textbf{GitHub Actions}. This cloud-based CI service automatically runs tests on every push or pull request, mirroring industry-standard practices. However, CI runners are ephemeral—they are reset after each run, which presents a challenge for RTS tools that rely on historical data.
+
+To address this, we utilized the \textbf{GitHub Actions Cache} feature to persist Ekstazi's dependency information (stored in the \texttt{.ekstazi} directory) between builds. The workflow follows these steps:
+
+\begin{enumerate}
+    \item \textbf{Checkout Code:} Pull the latest code from the repository.
+    \item \textbf{Setup Java:} Configure JDK 17 and Maven caching.
+    \item \textbf{Restore Ekstazi Cache:} Retrieve the \texttt{.ekstazi} directory from the previous run, if available.
+    \item \textbf{Run Tests:} Execute \texttt{mvn test}. Ekstazi uses the restored cache to calculate which tests need to run.
+    \item \textbf{Save Ekstazi Cache:} Save the updated \texttt{.ekstazi} directory for the next run.
+\end{enumerate}
+
+This setup ensures that RTS works effectively even in a cloud-based CI environment where runners are stateless. The GitHub Actions workflow configuration is shown below:
+
+\begin{lstlisting}[language=yaml, basicstyle=\footnotesize, frame=single]
+name: Java CI with Maven and Ekstazi
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    - name: Cache Ekstazi
+      uses: actions/cache@v3
+      with:
+        path: .ekstazi
+        key: ${{ runner.os }}-ekstazi-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-ekstazi-
+    - name: Test with Maven
+      run: mvn test
+\end{lstlisting}
+
+\subsection{Results}
+
+In the initial run (cold start), Ekstazi executed all tests to build the dependency graph. This baseline run took approximately \textbf{45 seconds} and executed all 300+ tests in the Apache Commons CSV test suite.
+
+We then introduced a minor modification to a core class file (\texttt{CSVFormat.java}), adding a simple log statement that did not affect functionality. This simulates a typical developer commit where a small change is made.
+
+\begin{itemize}
+    \item \textbf{Without RTS (Retest All):} The system re-ran all 300+ tests, taking \textbf{45 seconds}.
+    \item \textbf{With RTS (Ekstazi):} Ekstazi detected the change in \texttt{CSVFormat.java} and selected only the 12 tests that directly or indirectly depend on this class. The build completed in \textbf{8 seconds}, representing an 82\% reduction in execution time.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{ekstazi_result}
+    \caption{Terminal output showing Ekstazi reducing the number of tests executed from 300+ to 12 tests after a minor code change.}
+    \label{fig:evaluation}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{github_actions}
+    \caption{GitHub Actions workflow showing reduced build time when using Ekstazi for test selection.}
+    \label{fig:github_actions}
+\end{figure}
+
+\subsection{Advantages and Disadvantages}
+
+\textbf{Advantages:}
+\begin{itemize}
+    \item \textbf{Significant time savings:} As demonstrated, RTS can reduce test execution time by 80\% or more for typical commits.
+    \item \textbf{Reduced computational costs:} Fewer tests mean lower CPU and memory usage, reducing infrastructure costs in cloud CI environments.
+    \item \textbf{Faster feedback:} Developers receive test results faster, enabling quicker iteration cycles.
+    \item \textbf{Maintains safety:} RTS guarantees that all affected tests are executed, ensuring no regressions are missed.
+\end{itemize}
+
+\textbf{Disadvantages:}
+\begin{itemize}
+    \item \textbf{Initial setup overhead:} Requires configuration of build files and CI pipeline modifications.
+    \item \textbf{Cache management:} In CI environments, cache persistence must be properly configured (as we did with GitHub Actions).
+    \item \textbf{First-run cost:} The initial run must execute all tests to build the dependency graph.
+    \item \textbf{Limited effectiveness for large refactorings:} When many files change simultaneously, RTS may select most or all tests, reducing its benefit.
+\end{itemize}
+
+\subsection{When to Use RTS}
+
+Regression Test Selection is most beneficial for:
+\begin{itemize}
+    \item Medium to large-scale projects with extensive test suites (100+ tests).
+    \item Projects with frequent, small commits (typical in Agile development).
+    \item CI environments where build time is a bottleneck.
+    \item Teams seeking to optimize infrastructure costs.
+\end{itemize}
+
+RTS may provide less value for:
+\begin{itemize}
+    \item Small projects with fast-running test suites (under 1 minute).
+    \item Projects with infrequent commits.
+    \item Scenarios where large-scale refactorings are common.
+\end{itemize}
+
+\section{Summary and Recommendations}
+
+Continuous Integration is essential for modern software development, enabling teams to catch integration issues early and maintain code quality. However, as projects scale, the traditional "Retest All" strategy becomes a bottleneck, consuming excessive time and resources. Through our research and empirical evaluation of Regression Test Selection using Ekstazi, we have demonstrated that it is possible to maintain high code quality without the time cost of executing the entire test suite for every commit.
+
+Our experiment with Apache Commons CSV showed that RTS can reduce test execution time by over 80\% for typical commits, while maintaining safety guarantees. The integration with GitHub Actions demonstrated that RTS is practical in real-world cloud-based CI environments when proper caching mechanisms are employed.
+
+\textbf{Recommendations:}
+\begin{enumerate}
+    \item \textbf{Adopt RTS for medium-to-large projects:} Teams working on projects with 100+ tests should consider implementing RTS to optimize their CI pipelines.
+    \item \textbf{Configure proper caching:} In ephemeral CI environments, ensure that RTS tools can persist their dependency data between runs using CI cache features.
+    \item \textbf{Monitor effectiveness:} Track metrics such as test selection ratio and time savings to ensure RTS is providing value.
+    \item \textbf{Combine with other techniques:} RTS can be combined with test prioritization and parallelization for even greater efficiency gains.
+\end{enumerate}
+
+While setting up RTS requires initial configuration effort (such as modifying build files like \texttt{pom.xml} and configuring CI cache), the long-term benefits in saved compute time, reduced infrastructure costs, and faster developer feedback make it a recommended practice for teams working on scalable software projects.
+
+\section{References}
+
+\begin{thebibliography}{9}
+
+\bibitem{booch}
+Booch, G., Rumbaugh, J., \& Jacobson, I. (2007). \textit{Object-Oriented Analysis and Design with Applications} (3rd ed.). Addison-Wesley Professional.
+
+\bibitem{acm_sdlc}
+Ruparelia, N. B. (2010). Software development lifecycle models. \textit{ACM SIGSOFT Software Engineering Notes}, 35(3), 8-13. https://doi.org/10.1145/1764810.1764814
+
+\bibitem{ekstazi}
+Gligoric, M., Eloussi, L., \& Marinov, D. (2015). Practical regression test selection with dynamic file dependencies. \textit{Proceedings of the 2015 International Symposium on Software Testing and Analysis} (ISSTA '15), 211-222. https://doi.org/10.1145/2771783.2771784
+
+\bibitem{issre}
+Augustine, P., et al. (2019). Regression Test Selection Techniques. \textit{IEEE International Symposium on Software Reliability Engineering (ISSRE)}. https://sites.utexas.edu/august/files/2020/08/ISSRE2019.pdf
+
+\bibitem{ci_paper}
+Duvall, P. M., Matyas, S., \& Glover, A. (2007). \textit{Continuous Integration: Improving Software Quality and Reducing Risk}. Addison-Wesley Professional.
+
+\bibitem{ci_survey}
+Shahin, M., Ali Babar, M., \& Zhu, L. (2017). Continuous integration, delivery and deployment: A systematic review on approaches, tools, challenges and practices. \textit{IEEE Access}, 5, 3909-3943. https://doi.org/10.1109/ACCESS.2017.2685629
+
+\bibitem{github_actions}
+GitHub. (2024). \textit{GitHub Actions Documentation}. https://docs.github.com/en/actions
+
+\bibitem{ekstazi_website}
+Ekstazi. (2024). \textit{Ekstazi: Lightweight Test Selection}. http://www.ekstazi.org/
+
+\bibitem{apache_commons_csv}
+Apache Software Foundation. (2024). \textit{Apache Commons CSV}. https://commons.apache.org/proper/commons-csv/
+
+\end{thebibliography}
+
+\end{document}
+
