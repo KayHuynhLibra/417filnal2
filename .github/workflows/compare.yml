@@ -28,7 +28,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
-        cache-dependency-path: coms417/pom.xml
 
     - name: Cache Ekstazi
       if: matrix.ekstazi_enabled == true

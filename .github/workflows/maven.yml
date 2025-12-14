@@ -19,7 +19,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
-        cache-dependency-path: coms417/pom.xml
 
     # Cache Ekstazi directory to persist dependency information between runs
     - name: Cache Ekstazi
