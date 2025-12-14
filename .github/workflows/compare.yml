@@ -29,14 +29,8 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    - name: Cache Ekstazi
-      if: matrix.ekstazi_enabled == true
-      uses: actions/cache@v3
-      with:
-        path: coms417/.ekstazi
-        key: ${{ runner.os }}-ekstazi-${{ hashFiles('coms417/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-ekstazi-
+    # Note: Ekstazi cache removed since Ekstazi is disabled in CI
+    # Ekstazi plugin is commented out in pom.xml
 
     - name: Disable Ekstazi for baseline
       if: matrix.ekstazi_enabled == false

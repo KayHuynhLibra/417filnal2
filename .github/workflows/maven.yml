@@ -20,14 +20,9 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    # Cache Ekstazi directory to persist dependency information between runs
-    - name: Cache Ekstazi
-      uses: actions/cache@v3
-      with:
-        path: coms417/.ekstazi
-        key: ${{ runner.os }}-ekstazi-${{ hashFiles('coms417/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-ekstazi-
+    # Note: Ekstazi cache removed since Ekstazi is disabled in CI
+    # Ekstazi is commented out in pom.xml to avoid JVM attachment issues
+    # For local development, uncomment Ekstazi plugin and it will work
 
     - name: Test with Maven
       working-directory: coms417
