@@ -1,0 +1,31 @@
+name: Java CI with Maven and Ekstazi
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    # Note: Ekstazi cache removed since Ekstazi is disabled in CI
+    # Ekstazi is commented out in pom.xml to avoid JVM attachment issues
+    # For local development, uncomment Ekstazi plugin and it will work
+
+    - name: Test with Maven
+      working-directory: coms417
+      env:
+        MAVEN_OPTS: "-Xmx1024m"
+      run: mvn test
