@@ -31,4 +31,6 @@ jobs:
 
     - name: Test with Maven
       working-directory: coms417
+      env:
+        MAVEN_OPTS: "-Xmx1024m"
       run: mvn test
