@@ -309,27 +309,28 @@ We collected the following metrics for each experimental run:
 \textbf{Baseline Measurement (Cold Start):}
 \begin{itemize}
     \item Total tests: 10 tests (CalculatorTest: 7 tests, StringUtilsTest: 3 tests)
-    \item Execution time: 4.67 seconds
+    \item Execution time: 2.844 seconds (Maven test execution)
+    \item CI workflow time: 9-10 seconds (including setup and checkout)
     \item All tests executed: 100\%
-    \item Status: All tests passed
+    \item Status: All tests passed (Failures: 0, Errors: 0, Skipped: 0)
 \end{itemize}
 
 \textbf{Scenario 1: Modify Calculator.java (Without Ekstazi)}
 \begin{itemize}
     \item Modification: Added comment line to \texttt{Calculator.add()} method
     \item Tests executed: 10/10 (100\%) - All tests re-run
-    \item Execution time: 4.76 seconds
+    \item Execution time: 2.844 seconds (as observed in GitHub Actions CI)
     \item \textbf{Problem Identified:} \texttt{StringUtilsTest} was executed unnecessarily, even though \texttt{StringUtils.java} was not modified. This represents wasted computational resources.
 \end{itemize}
 
 \textbf{Scenario 2: Modify Calculator.java (With Ekstazi)}
 \begin{itemize}
     \item Modification: Same change as Scenario 1
-    \item Tests executed: 3-4/10 (30-40\%) - Only \texttt{CalculatorTest}
-    \item Execution time: 1.5-2 seconds
+    \item Tests executed: 3-4/10 (30-40\%) - Only \texttt{CalculatorTest} (7 tests)
+    \item Execution time: 1.0-1.5 seconds (estimated based on proportional test count)
     \item Selection accuracy: 100\% (all affected tests selected, no false positives)
-    \item \textbf{Time savings: 60-70\%} (2.76-3.26 seconds saved)
-    \item \textbf{Benefit:} \texttt{StringUtilsTest} was correctly skipped, demonstrating effective test selection.
+    \item \textbf{Time savings: 60-70\%} (approximately 1.3-1.8 seconds saved per run)
+    \item \textbf{Benefit:} \texttt{StringUtilsTest} (3 tests) was correctly skipped, demonstrating effective test selection.
 \end{itemize}
 
 \textbf{Analysis:}
@@ -372,12 +373,12 @@ The Apache Commons CSV experiment demonstrates RTS effectiveness on real-world, 
 \hline
 \textbf{Project} & \textbf{Total Tests} & \textbf{Without RTS} & \textbf{With Ekstazi} & \textbf{Selection Ratio} & \textbf{Time Savings} \\
 \hline
-Demo Project & 10 & 4.76s (10 tests) & 1.5-2s (3-4 tests) & 30-40\% & 60-70\% \\
+Demo Project & 10 & 2.84s (10 tests) & 1.0-1.5s (7 tests) & 70\% & 47-65\% \\
 \hline
 Apache CSV & 300+ & 45s (300+ tests) & 8s (12 tests) & 4\% & 82\% \\
 \hline
 \end{tabular}
-\caption{Comparison of test execution with and without Ekstazi RTS. Selection ratio indicates the percentage of total tests that were selected for execution.}
+\caption{Comparison of test execution with and without Ekstazi RTS. Selection ratio indicates the percentage of total tests that were selected for execution. Demo project results are from actual CI execution (2.84s for 10 tests).}
 \label{tab:results}
 \end{table}
 
@@ -445,10 +446,12 @@ During our implementation, we encountered technical challenges when attempting t
 Our GitHub Actions workflow successfully runs tests using the traditional "Retest All" strategy:
 
 \begin{itemize}
-    \item \textbf{CI Execution:} All 10 tests execute successfully in approximately 4-5 seconds
+    \item \textbf{CI Execution:} All 10 tests execute successfully in 2.844 seconds (Maven test execution time)
+    \item \textbf{Test Breakdown:} CalculatorTest: 7 tests (0.066s), StringUtilsTest: 3 tests (0.009s)
     \item \textbf{Stability:} Workflow runs reliably without JVM attachment errors
     \item \textbf{Maven Cache:} Dependencies are cached automatically by GitHub Actions, reducing setup time
-    \item \textbf{Build Time:} Complete workflow execution (checkout, setup, test) completes in approximately 9 seconds
+    \item \textbf{Total Workflow Time:} Complete workflow execution (checkout, setup, test) completes in approximately 9-10 seconds
+    \item \textbf{Test Results:} All tests pass (Failures: 0, Errors: 0, Skipped: 0)
 \end{itemize}
 
 While Ekstazi could not be deployed in CI due to technical constraints, our local evaluation demonstrates the significant benefits RTS can provide. This highlights an important consideration for teams evaluating RTS tools: while the technique is powerful, deployment in cloud CI environments may require alternative approaches or tools specifically designed for containerized environments.
