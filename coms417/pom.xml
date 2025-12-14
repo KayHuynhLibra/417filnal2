@@ -51,15 +51,13 @@
             </plugin>
 
             <!-- Ekstazi Plugin - Regression Test Selection -->
-            <!-- Note: Ekstazi may have issues in CI environments. 
-                 For CI, consider disabling or using alternative approaches. -->
+            <!-- Note: Ekstazi disabled in CI due to JVM attachment issues.
+                 Enable locally by uncommenting this plugin. -->
+            <!--
             <plugin>
                 <groupId>org.ekstazi</groupId>
                 <artifactId>ekstazi-maven-plugin</artifactId>
                 <version>5.3.0</version>
-                <configuration>
-                    <restore>true</restore>
-                </configuration>
                 <executions>
                     <execution>
                         <id>ekstazi-select</id>
@@ -70,6 +68,7 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
         </plugins>
     </build>
 </project>
