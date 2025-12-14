@@ -1,7 +1,7 @@
 name: Compare: With vs Without Ekstazi
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
   push:
     branches: [ "main", "master" ]
     paths:
@@ -14,10 +14,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: "Without Ekstazi (Retest All)"
-            ekstazi: false
-          - name: "With Ekstazi (RTS)"
-            ekstazi: true
+          - test_name: "Without Ekstazi (Retest All)"
+            ekstazi_enabled: false
+          - test_name: "With Ekstazi (RTS)"
+            ekstazi_enabled: true
 
     steps:
     - uses: actions/checkout@v3
@@ -30,8 +30,8 @@ jobs:
         cache: maven
         cache-dependency-path: coms417/pom.xml
 
-    - name: Cache Ekstazi (if enabled)
-      if: matrix.ekstazi == true
+    - name: Cache Ekstazi
+      if: matrix.ekstazi_enabled == true
       uses: actions/cache@v3
       with:
         path: coms417/.ekstazi
@@ -40,24 +40,23 @@ jobs:
           ${{ runner.os }}-ekstazi-
 
     - name: Disable Ekstazi for baseline
-      if: matrix.ekstazi == false
+      if: matrix.ekstazi_enabled == false
       working-directory: coms417
       run: |
-        # Comment out Ekstazi plugin temporarily
-        sed -i 's/<plugin>/,<!--plugin>/g' pom.xml
+        sed -i 's/<plugin>/,<!--plugin>/g' pom.xml || true
         sed -i 's/<\/plugin>/<\/plugin-->/g' pom.xml || true
 
-    - name: Run Tests - ${{ matrix.name }}
+    - name: Run Tests
       working-directory: coms417
       run: |
-        echo "=== Running tests ${{ matrix.name }} ==="
-        echo "Ekstazi enabled: ${{ matrix.ekstazi }}"
-        time mvn clean test
+        echo "=== Running tests: ${{ matrix.test_name }} ==="
+        echo "Ekstazi enabled: ${{ matrix.ekstazi_enabled }}"
+        mvn clean test
 
-    - name: Count Tests Executed
+    - name: Test Results Summary
       working-directory: coms417
       run: |
-        if [ "${{ matrix.ekstazi }}" == "true" ]; then
+        if [ "${{ matrix.ekstazi_enabled }}" == "true" ]; then
           echo "Ekstazi was enabled - check logs above for selected tests"
         else
           echo "All tests were executed (Retest All strategy)"
