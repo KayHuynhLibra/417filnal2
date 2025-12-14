@@ -29,8 +29,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-ekstazi-
 
-    - name: Test with Maven
+    - name: Test with Maven (without Ekstazi for CI stability)
       working-directory: coms417
       env:
         MAVEN_OPTS: "-Xmx1024m"
-      run: mvn test
+      run: mvn test -Dekstazi.skip=true
