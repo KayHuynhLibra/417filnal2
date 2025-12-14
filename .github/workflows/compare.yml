@@ -1,0 +1,65 @@
+name: Compare: With vs Without Ekstazi
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'coms417/src/**'
+      - 'coms417/pom.xml'
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: "Without Ekstazi (Retest All)"
+            ekstazi: false
+          - name: "With Ekstazi (RTS)"
+            ekstazi: true
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        cache-dependency-path: coms417/pom.xml
+
+    - name: Cache Ekstazi (if enabled)
+      if: matrix.ekstazi == true
+      uses: actions/cache@v3
+      with:
+        path: coms417/.ekstazi
+        key: ${{ runner.os }}-ekstazi-${{ hashFiles('coms417/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-ekstazi-
+
+    - name: Disable Ekstazi for baseline
+      if: matrix.ekstazi == false
+      working-directory: coms417
+      run: |
+        # Comment out Ekstazi plugin temporarily
+        sed -i 's/<plugin>/,<!--plugin>/g' pom.xml
+        sed -i 's/<\/plugin>/<\/plugin-->/g' pom.xml || true
+
+    - name: Run Tests - ${{ matrix.name }}
+      working-directory: coms417
+      run: |
+        echo "=== Running tests ${{ matrix.name }} ==="
+        echo "Ekstazi enabled: ${{ matrix.ekstazi }}"
+        time mvn clean test
+
+    - name: Count Tests Executed
+      working-directory: coms417
+      run: |
+        if [ "${{ matrix.ekstazi }}" == "true" ]; then
+          echo "Ekstazi was enabled - check logs above for selected tests"
+        else
+          echo "All tests were executed (Retest All strategy)"
+        fi
+
